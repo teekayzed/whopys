@@ -1,19 +1,19 @@
 #! /usr/bin/python
 #################################################
-#			whoisLib							#
+#                   whoisLib                    #
 #################################################
-# teekayzed 									#
-# teekayzed@users.noreply.github.com			#
-#												#
-# Features: 									#
-#	- Searches for preexisting PKL or CSV		#
-#	- If not found, builds TLD&WHOIS pairings	#
-#		and saves them in run directory			#
-#	- If found it scrapes iana.org for any new	#
-#		TLDs 									#
-#	- Performs WHOIS lookup of domains			#
-#	- Performs RWHOIS lookup of IP addresses	#
-#	- Will export "tld,whois" pairings to CSV	#
+# teekayzed                                     #
+# teekayzed@users.noreply.github.com            #
+#                                               #
+# Features:                                     #
+#   - Searches for preexisting PKL or CSV       #
+#   - If not found, builds TLD&WHOIS pairings   #
+#      and saves them in run directory          #
+#   - If found it scrapes iana.org for any new  #
+#      TLDs                                     #
+#   - Performs WHOIS lookup of domains          #
+#   - Performs RWHOIS lookup of IP addresses    #
+#   - Will export "tld,whois" pairings to CSV   #
 #################################################
 #################################################
 '''
