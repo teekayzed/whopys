@@ -1,79 +1,46 @@
-import pycurl
+import requests
 import re
-from StringIO import StringIO
+
 
 
 targetURL = 'https://www.iana.org/domains/root/db'
 
-storage = StringIO()
-
-curl = pycurl.Curl()
-curl.setopt(curl.URL, targetURL)
-curl.setopt(curl.FOLLOWLOCATION, True)
-curl.setopt(curl.WRITEFUNCTION, storage.write)
-curl.perform()
-
-content = storage.getvalue()
+r = requests.get(targetURL)
 
 regex = '<span class="domain tld">+<a href="\/\w*\/\w*\/\w*\/\w*\.\w*">'
 
-
-matches = re.findall(regex, content)
+matches = re.findall(regex, r.text)
 
 # Create empty list
 tldURIs = []
-
+whoisDictionary = {}
 # For each entry in the list of matches, trim off the
 # unncessary bits and slap 'em into the tldURIs list
 for match in matches:
 	tldURIs.append(match[34:-2])
 
+
+
 # Initialize the progress counter
 progress=0
-content = ''
-del matches[:]
+
 # For every URI found on the main page, loop
-
-'''
-THIS LOOP IS WHERE SHIT IS BROKEN.
-IT KEEPS APPENDING RESULTS OF MATCHES
-INSTEAD OF CLEARING THEM AS INDICATED
-'''
-
-
 for uri in tldURIs:
 
-	del content
 
 	# Set each 'key' in dict to the '.*' value
 	key = '.' + uri[17:-5]
 
 	# Generate a full URI for each TLD and retrieve
 	newURI = 'https://www.iana.org' + uri
-	print key
-	print newURI
-	print '\n\n\n'
 
-	
-	curl.setopt(curl.URL, newURI)
-	storage2=StringIO()
-	curl.setopt(curl.WRITEFUNCTION, storage2.write)
-	curl.perform()
-	
-	#print 'Content is : ' + str(content)
-	content = storage2.getvalue()
-	#print 'Content is : ' + str(content)
-
+	r = requests.get(newURI)
 
 	# Find place in page for the WHOIS server and match
 	regex = 'WHOIS Server:.*'
 	
-	del matches
-	matches = ''
-	print 'list of matches : ' + str(matches)
-	matches = re.findall(regex, content)
-	print 'list of matches : ' + str(matches)
-'''
+	matches = re.findall(regex, r.text)
+
 	# If a match is found continue, or else the TLD
 	# Does not have a WHOIS server and should be
 	# ignored.
@@ -85,7 +52,7 @@ for uri in tldURIs:
 
 		# Add entry to the dictionary of the '.*' for the key
 		# and the WHOIS server for the match
-		tldDictionary[key] = match
+		whoisDictionary[key] = match
 
 		# The following is for progress notification
 		print 'WHOIS server found for ' + key + ' at ' + match
@@ -94,9 +61,11 @@ for uri in tldURIs:
 			print 'Number of domains found: ' + str(progress)
 
 # Once completed print out the dictionary
-print tldDictionary
+print whoisDictionary
 
-'''
+
+
+
 #####################
 #
 # Class for all info for a TLD
@@ -123,7 +92,18 @@ print tldDictionary
 #
 #####################
 '''
-def dict2CSV(dictionary,filename):
+
+def checkForPKL():
+
+def updateTLD():
+
+def getWhoisServer(tldSuffix):
+
+def getWhois(tld):
+
+def getRWhois(ip):
+
+def dictToCSV(dictionary,filename):
 	import csv
 	with open(filename,'wb') as csvfile:
 		csvwriter = csv.writer(csvfile, delimiter=',', 
@@ -131,17 +111,7 @@ def dict2CSV(dictionary,filename):
 		for key, value in dictionary.iteritems():
 			csvwriter.writerow(key,value)
 
-dict2CSV(tldDictionary,'tldDictionary.csv')
-'''
-
-'''
-def buildTLDfile():
+def dictToPKL(dictionary,pklname):
 
 
-
-def getWhoisServer():
-
-
-
-def whoisLookup():
 '''
