@@ -17,12 +17,24 @@
 #################################################
 #################################################
 '''
+whoisLib.py 
+.checks for PKL/CSV existence, if not notifies user and gives
+    chance to cancel, then performs the full scrape of tld/whois pairings
+  -u --update runs updateTLD to update and then export
+  -w --whois  runs getWhoisServer to find tld passed, if not found, scrapes
+         iana for the TLD, adds it to dict, then runs getWhois
+  -i --ip  runs getRWhois
+.then calls dictToCSV and dictToPKL to export dictionary
+.then returns results of whatever was called, then exits
+
+	
+
 #######################
 #  TO DO LIST
 #  
-#  --Move main into respective functions
-#  --Build out args and test
-#  --Build out PKL and CSV check
+#  XXMove main into respective functions
+#  XXBuild out args and test
+#  XXBuild out PKL and CSV check
 #  --Build out updateTLD func and logic
 #  --Build out getWhoisServer to check imported
 #		CSV/PKL for existing, if not lookup
@@ -32,8 +44,8 @@
 #  --Build out getWhois - perform whois lookup
 #  --Build out TLDWhois Class - See notes below
 #  --Build out getRWhois - perform IP lookup
-#  --Build out dictToCSV
-#  --Build out dictToPKL
+#  XXBuild out dictToCSV
+#  XXBuild out dictToPKL
 #  --Tidy up documentation and comments
 #
 #		#####################
@@ -70,6 +82,12 @@
 #########
 import requests
 import re
+import sys
+import argparse
+import os.path
+import csv
+import timeit
+import pickle
 
 #########
 # VARS
@@ -80,10 +98,11 @@ programVersion="1.0"
 
 tldDB='https://www.iana.org/domains/root/db'
 tldURIList = [] #Init list for list for all TLD URIs
+
 whoisDictionary = {}
 
 verbose=False
-progress=0
+
 ##################################################
 # FUNCTIONS
 ##################################################
@@ -93,6 +112,10 @@ progress=0
 def getArgs():
 	parser = argparse.ArgumentParser(prog=programName, description=programDescription)
 	parser.add_argument("-a","--arg",help="ARG HELP",required=False)
+	parser.add_argument("-v","--verbose",help="Increase verbosity",action="store_true",required=False)
+	parser.add_argument("-u","--update",help="Update TLD/Whois pairing",action="store_true",required=False)
+	parser.add_argument("-w","--whois",help="Perform whois lookup",required=False)
+	parser.add_argument("-i","--ip",help="Perform IP lookup",required=False)
 
 
 	return parser.parse_args()
@@ -118,6 +141,101 @@ def getArgs():
 # MAIN
 #############
 def main(args):
+	
+	if args.verbose:
+		startTime = timeit.default_timer()
+
+	if checkForFile("tldwhois.pkl") == True:
+		tldPKLExists = True
+		if args.verbose:
+			print "PKL file exists."
+		#If it exists, import PKL to dictionary
+	
+	if checkForFile("tldwhois.csv") == True:
+		tldCSVExists = True
+		if args.verbose:
+			print "CSV file exists."
+		#If it exists, but not PKL, import CSV to dictionary
+	
+	if (not checkForFile("tldwhois.pkl")) and (not checkForFile("tldwhois.csv")):
+		if args.verbose:
+			print "Neither the PKL or CSV file exist. Full update is needed..."
+		updateTLD()
+		global whoisDictionary
+		dictToPKL(whoisDictionary,"tldwhois.pkl")
+		dictToCSV(whoisDictionary,"tldwhois.csv")
+		#If neither exists. Notify user, and ask if want to create. Then update, export to PKL and CSV, then continue
+	
+	if (checkForFile("tldwhois.pkl") == True) and (checkForFile("tldwhois.csv") == False):
+		#Import PKL. 
+		if args.verbose:
+			print "PKL exists... Importing..."
+		whoisDictionary = pickle.load(open("tldwhois.pkl", "rb"))
+		#Export to CSV.
+		if args.verbose:
+			print "CSV doesn't exist... Exporting the PKL to CSV..."
+		dictToCSV(whoisDictionary,"tldwhois.csv")
+
+	if (checkForFile("tldwhois.pkl") == False) and (checkForFile("tldwhois.csv") == True):
+		
+		#Import CSV. 
+		if args.verbose:
+			print "CSV exists... Importing..."
+		reader = csv.reader(open('tldwhois.csv', 'rb'))
+		whoisDictionary = dict(x for x in reader)
+		#Export to PKL.
+		if args.verbose:
+			print "PKL doesn't exist... Exporting the CSV to PKL..."
+		dictToPKL(whoisDictionary,"tldwhois.pkl")
+
+	if (checkForFile("tldwhois.pkl") == True) and (checkForFile("tldwhois.csv") == True):
+		#Both true, continue.
+		if args.verbose:
+			print "PKL and CSV exist. Continuing."
+
+	if args.update:
+		#go through entire process to create PKL and CSV files. Might have to clear existing. Who knows
+		updateTLD()
+
+	if args.whois:
+		getWhois(getWhoisServer(args.whois))		
+
+	if args.ip:
+		getRWhois(ip)
+
+	endTime = timeit.default_timer()
+	if args.verbose:
+		print endTime - startTime
+	
+	# Once completed print out the dictionary
+	#print whoisDictionary
+#############
+# END OF MAIN
+#############
+
+
+#############
+# checkForPKL
+#############
+def checkForFile(filename):
+	if os.path.isfile(sys.path[0] + "/" + filename):
+		return True
+	else:
+		return False
+#############
+# END OF checkForPKL
+#############
+
+
+#############
+# updateTLD
+#############
+def updateTLD():
+	global whoisDictionary
+	if args.verbose:
+		print "Fully updating TLD list..."
+
+
 	r = requests.get(tldDB)
 	regex = '<span class="domain tld">+<a href="\/\w*\/\w*\/\w*\/\w*\.\w*">'
 	matches = re.findall(regex, r.text)
@@ -128,6 +246,7 @@ def main(args):
 		tldURIList.append(match[34:-2])
 
 	# For every URI found on the main page, loop
+	progress = 0
 	for uri in tldURIList:
 		# Set each 'key' in dict to the '.*' value
 		key = '.' + uri[17:-5]
@@ -156,43 +275,14 @@ def main(args):
 			whoisDictionary[key] = match
 
 			# The following is for progress notification
-			print 'WHOIS server found for ' + key + ' at ' + match
+			
+			
 			progress += 1
-			if (progress % 50) == 0:
-				print 'Number of domains found: ' + str(progress)
+			if args.verbose:
+				print 'WHOIS server found for ' + key + ' at ' + match
+				if (progress % 50) == 0:
+					print 'Number of domains found: ' + str(progress)
 
-	# Once completed print out the dictionary
-	print whoisDictionary
-#############
-# END OF MAIN
-#############
-
-
-#############
-# checkForPKL
-#############
-def checkForPKL():
-	print "checkforPKL"
-#############
-# END OF checkForPKL
-#############
-
-
-#############
-# checkForCSV
-#############
-def checkForPKL():
-	print "checkforPKL"
-#############
-# END OF checkForCSV
-#############
-
-
-#############
-# updateTLD
-#############
-def updateTLD():
-	print "updateTLD"
 #############
 # END OF updateTLD
 #############
@@ -232,7 +322,11 @@ def getRWhois(ip):
 # dictToCSV
 #############
 def dictToCSV(dictionary,filename):
-	print "dictToCSV"
+	if args.verbose:
+		print "Exporting dictionary to CSV..."
+	writer = csv.writer(open(filename, 'wb'))
+	for key, value in dictionary.items():
+		writer.writerow([key, value])
 #############
 # END OF dictToCSV
 #############
@@ -242,7 +336,9 @@ def dictToCSV(dictionary,filename):
 # dictToPKL
 #############
 def dictToPKL(dictionary,pklname):
-	print "dictToPKL"
+	if args.verbose:
+		print "Exporting dictionary to PKL..."
+	pickle.dump(dictionary,open(pklname,"wb"))
 #############
 # END OF dictToPKL
 #############
