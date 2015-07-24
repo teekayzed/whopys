@@ -60,3 +60,6 @@ target/
 # Preexisting PKL and CSV
 *.pkl
 *.csv
+
+# Backup files
+*.bak
